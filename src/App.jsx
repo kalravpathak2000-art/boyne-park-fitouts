@@ -8,6 +8,7 @@ import {
 const MANAGER_PIN = "1234";
 const COMPANY     = "Boyne Park Fitouts";
 const TRADES      = ["Fixer","Taper","Plasterer","Painter","Labourer","Other"];
+const SITES       = ["Site 1","Site 2","Site 3","Site 4","Other"];
 const BRAND       = "#1A3A5C";
 const BRAND2      = "#F0A500";
 const BRAND_DARK  = "#112742";
@@ -202,7 +203,7 @@ function Landing({ onRole }) {
 // ══════════════════════════════════════════════════════════════════════════
 function WorkerForm({ defaultTrade, onBack }) {
   const [form, setForm] = useState({
-    workerName:"", trade:defaultTrade, date:todayStr(),
+    workerName:"", trade:defaultTrade, site:"Site 1", date:todayStr(),
     startTime:"07:00", endTime:"16:00", area:"", description:"", materials:"",
   });
   const [photos,  setPhotos]  = useState([]);   // array of base64 data URLs
@@ -295,6 +296,19 @@ function WorkerForm({ defaultTrade, onBack }) {
                   color:form.trade===t?"#fff":"#6B7280",
                   fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit",
                 }}>{t}</button>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginTop:16 }}>
+            <label style={S.label}>Site *</label>
+            <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+              {SITES.map(s => (
+                <button key={s} onClick={() => set("site",s)} style={{
+                  padding:"8px 14px", border:`2px solid ${form.site===s?BRAND2:"#E5E7EB"}`,
+                  borderRadius:8, background:form.site===s?BRAND2:"#fff",
+                  color:form.site===s?BRAND_DARK:"#6B7280",
+                  fontWeight:600, fontSize:13, cursor:"pointer", fontFamily:"inherit",
+                }}>{s}</button>
               ))}
             </div>
           </div>
@@ -556,7 +570,7 @@ function ManagerDashboard({ onBack }) {
           ))}
         </div>
 
-        {[["📍 Area / Location", selected.area||"Not specified"],["📝 Work Description", selected.description],selected.materials&&["🧱 Materials Used", selected.materials]].filter(Boolean).map(([l,v]) => (
+        {[["🏢 Site", selected.site||"Not specified"],["📍 Area / Location", selected.area||"Not specified"],["📝 Work Description", selected.description],selected.materials&&["🧱 Materials Used", selected.materials]].filter(Boolean).map(([l,v]) => (
           <div key={l} style={S.card}>
             <div style={{ fontSize:11, fontWeight:700, color:"#9CA3AF", letterSpacing:"0.08em", marginBottom:8 }}>{l}</div>
             <div style={{ fontSize:14, lineHeight:1.6 }}>{v}</div>
@@ -678,7 +692,7 @@ function ManagerDashboard({ onBack }) {
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
               <div>
                 <div style={{ fontWeight:700, fontSize:15 }}>{rec.workerName}</div>
-                <div style={{ fontSize:12, color:"#9CA3AF", marginTop:2 }}>{rec.trade} · {formatDate(rec.date)}</div>
+                <div style={{ fontSize:12, color:"#9CA3AF", marginTop:2 }}>{rec.trade} · {rec.site} · {formatDate(rec.date)}</div>
               </div>
               <div style={S.tag(rec.status)}>
                 <span style={{ width:6, height:6, borderRadius:"50%", background:STATUS_CONFIG[rec.status].dot }} />
