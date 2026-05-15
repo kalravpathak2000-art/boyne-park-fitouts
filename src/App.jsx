@@ -8,7 +8,7 @@ import {
 const MANAGER_PIN = "1234";
 const COMPANY     = "Boyne Park Fitouts";
 const TRADES      = ["Fixer","Taper","Plasterer","Painter","Labourer","Other"];
-const SITES       = ["Site 1","Site 2","Site 3","Site 4","Other"];
+const SITES       = ["Mastercrad","Frame","UCD","BOA","Other"];
 const BRAND       = "#1A3A5C";
 const BRAND2      = "#F0A500";
 const BRAND_DARK  = "#112742";
