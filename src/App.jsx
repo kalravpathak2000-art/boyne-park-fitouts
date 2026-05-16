@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { db } from "./firebase";
+import { db, storage } from "./firebase";
 import {
   collection, addDoc, getDocs, doc, updateDoc,
   query, orderBy, serverTimestamp,
 } from "firebase/firestore";
+import { ref, uploadString, getDownloadURL } from "firebase/storage";
 
 const MANAGER_PIN = "1234";
 const COMPANY     = "Boyne Park Fitouts";
@@ -52,10 +53,24 @@ async function loadRecords() {
 }
 
 async function addRecord(record) {
-  await addDoc(collection(db,"daywork"), {
+  const docRef = await addDoc(collection(db,"daywork"), {
     ...record,
+    photos: [],
     submittedAt: serverTimestamp(),
   });
+
+  if (!record.photos || record.photos.length === 0) return;
+
+  const urls = await Promise.all(record.photos.map(async (photo, index) => {
+    const match = photo.match(/^data:(image\/[^;]+);base64,/);
+    const mimeType = match ? match[1] : "image/jpeg";
+    const ext = mimeType.split("/")[1] || "jpg";
+    const fileRef = ref(storage, `daywork/${docRef.id}/${Date.now()}_${index}.${ext}`);
+    await uploadString(fileRef, photo, "data_url");
+    return await getDownloadURL(fileRef);
+  }));
+
+  await updateDoc(docRef, { photos: urls });
 }
 
 async function updateRecord(id, updates) {
