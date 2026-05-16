@@ -22,6 +22,28 @@ function formatDate(d) {
   return `${day}/${m}/${y}`;
 }
 
+function resizeImage(file, maxDimension = 1024) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const ratio = Math.min(maxDimension / img.width, maxDimension / img.height, 1);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.75));
+      };
+      img.onerror = reject;
+      img.src = event.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 function calcHours(start, end) {
   if (!start || !end) return 0;
   const [sh,sm] = start.split(":").map(Number);
@@ -53,24 +75,23 @@ async function loadRecords() {
 }
 
 async function addRecord(record) {
-  const docRef = await addDoc(collection(db,"daywork"), {
+  let urls = [];
+  if (record.photos && record.photos.length > 0) {
+    urls = await Promise.all(record.photos.map(async (photo, index) => {
+      const match = photo.match(/^data:(image\/[^;]+);base64,/);
+      const mimeType = match ? match[1] : "image/jpeg";
+      const ext = mimeType.split("/")[1] || "jpg";
+      const fileRef = ref(storage, `daywork/${Date.now()}_${index}.${ext}`);
+      await uploadString(fileRef, photo, "data_url");
+      return await getDownloadURL(fileRef);
+    }));
+  }
+
+  await addDoc(collection(db,"daywork"), {
     ...record,
-    photos: [],
+    photos: urls,
     submittedAt: serverTimestamp(),
   });
-
-  if (!record.photos || record.photos.length === 0) return;
-
-  const urls = await Promise.all(record.photos.map(async (photo, index) => {
-    const match = photo.match(/^data:(image\/[^;]+);base64,/);
-    const mimeType = match ? match[1] : "image/jpeg";
-    const ext = mimeType.split("/")[1] || "jpg";
-    const fileRef = ref(storage, `daywork/${docRef.id}/${Date.now()}_${index}.${ext}`);
-    await uploadString(fileRef, photo, "data_url");
-    return await getDownloadURL(fileRef);
-  }));
-
-  await updateDoc(docRef, { photos: urls });
 }
 
 async function updateRecord(id, updates) {
@@ -233,19 +254,20 @@ function WorkerForm({ defaultTrade, onBack }) {
   // ── Photo helpers ──
   const addPhotos = (e) => {
     const files = Array.from(e.target.files);
-    files.forEach(file => {
+    files.forEach(async (file) => {
       setPhotos(prev => {
         if (prev.length >= 3) return prev;
-        return prev; // will be updated by reader below
+        return prev;
       });
-      const reader = new FileReader();
-      reader.onload = ev => {
+      try {
+        const resized = await resizeImage(file, 1024);
         setPhotos(prev => {
           if (prev.length >= 3) return prev;
-          return [...prev, ev.target.result];
+          return [...prev, resized];
         });
-      };
-      reader.readAsDataURL(file);
+      } catch (err) {
+        console.error("Photo resize failed:", err);
+      }
     });
     // reset input so same file can be re-selected after removal
     e.target.value = "";
