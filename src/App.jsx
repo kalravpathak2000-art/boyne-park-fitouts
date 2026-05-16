@@ -245,7 +245,8 @@ function WorkerForm({ defaultTrade, onBack }) {
       await addRecord({ ...form, hoursWorked:hours, status:"pending", managerNote:"", photos });
       setDone(true);
     } catch(e) {
-      setError("Failed to submit. Check your internet connection and try again.");
+      console.error("Submit error:", e);
+      setError(`Failed to submit: ${e?.message || e}. Check your internet connection and try again.`);
     } finally { setSaving(false); }
   };
 
