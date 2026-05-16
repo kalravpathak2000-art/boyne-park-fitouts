@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import { db, storage } from "./firebase";
+import { db } from "./firebase";
 import {
   collection, addDoc, getDocs, doc, updateDoc,
   query, orderBy, serverTimestamp,
 } from "firebase/firestore";
-import { ref, uploadString, getDownloadURL } from "firebase/storage";
 
 const MANAGER_PIN = "1234";
 const COMPANY     = "Boyne Park Fitouts";
@@ -20,28 +19,6 @@ function formatDate(d) {
   if (!d) return "";
   const [y,m,day] = d.split("-");
   return `${day}/${m}/${y}`;
-}
-
-function resizeImage(file, maxDimension = 1024) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const ratio = Math.min(maxDimension / img.width, maxDimension / img.height, 1);
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(img.width * ratio);
-        canvas.height = Math.round(img.height * ratio);
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL("image/jpeg", 0.75));
-      };
-      img.onerror = reject;
-      img.src = event.target.result;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 }
 
 function calcHours(start, end) {
@@ -75,21 +52,8 @@ async function loadRecords() {
 }
 
 async function addRecord(record) {
-  let urls = [];
-  if (record.photos && record.photos.length > 0) {
-    urls = await Promise.all(record.photos.map(async (photo, index) => {
-      const match = photo.match(/^data:(image\/[^;]+);base64,/);
-      const mimeType = match ? match[1] : "image/jpeg";
-      const ext = mimeType.split("/")[1] || "jpg";
-      const fileRef = ref(storage, `daywork/${Date.now()}_${index}.${ext}`);
-      await uploadString(fileRef, photo, "data_url");
-      return await getDownloadURL(fileRef);
-    }));
-  }
-
   await addDoc(collection(db,"daywork"), {
     ...record,
-    photos: urls,
     submittedAt: serverTimestamp(),
   });
 }
@@ -242,7 +206,6 @@ function WorkerForm({ defaultTrade, onBack }) {
     workerName:"", trade:defaultTrade, site:"Site 1", date:todayStr(),
     startTime:"07:00", endTime:"16:00", area:"", description:"", materials:"",
   });
-  const [photos,  setPhotos]  = useState([]);   // array of base64 data URLs
   const [saving,  setSaving]  = useState(false);
   const [done,    setDone]    = useState(false);
   const [error,   setError]   = useState("");
@@ -251,35 +214,12 @@ function WorkerForm({ defaultTrade, onBack }) {
   const hours = calcHours(form.startTime, form.endTime);
   const set   = (k,v) => setForm(f => ({ ...f, [k]:v }));
 
-  // ── Photo helpers ──
-  const addPhotos = (e) => {
-    const files = Array.from(e.target.files);
-    files.forEach(async (file) => {
-      setPhotos(prev => {
-        if (prev.length >= 3) return prev;
-        return prev;
-      });
-      try {
-        const resized = await resizeImage(file, 1024);
-        setPhotos(prev => {
-          if (prev.length >= 3) return prev;
-          return [...prev, resized];
-        });
-      } catch (err) {
-        console.error("Photo resize failed:", err);
-      }
-    });
-    // reset input so same file can be re-selected after removal
-    e.target.value = "";
-  };
-
-  const removePhoto = (i) => setPhotos(p => p.filter((_, idx) => idx !== i));
 
   const submit = async () => {
     if (!form.workerName || !form.description) return;
     setSaving(true); setError("");
     try {
-      await addRecord({ ...form, hoursWorked:hours, status:"pending", managerNote:"", photos });
+      await addRecord({ ...form, hoursWorked:hours, status:"pending", managerNote:"" });
       setDone(true);
     } catch(e) {
       console.error("Submit error:", e);
@@ -294,7 +234,7 @@ function WorkerForm({ defaultTrade, onBack }) {
       <div style={{ fontSize:22, fontWeight:800, marginBottom:8 }}>Record Submitted!</div>
       <div style={{ color:"#6B7280", fontSize:14, marginBottom:32 }}>Daywork for {formatDate(form.date)} has been saved.</div>
       <div style={{ display:"flex", flexDirection:"column", gap:12, width:"100%", maxWidth:300 }}>
-        <button style={S.btn(true)} onClick={() => { setDone(false); set("description",""); set("materials",""); setPhotos([]); }}>
+        <button style={S.btn(true)} onClick={() => { setDone(false); set("description",""); set("materials",""); }}>
           Submit Another
         </button>
         <button style={{ ...S.btn(false), background:"transparent", color:BRAND, border:"2px solid "+BRAND }} onClick={onBack}>
@@ -397,59 +337,8 @@ function WorkerForm({ defaultTrade, onBack }) {
           </div>
         </div>
 
-        {/* Photo upload */}
-        <div style={S.card}>
-          <label style={S.label}>Site Photos (up to 3, optional)</label>
-          <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
-            {photos.map((src, i) => (
-              <div key={i} style={{ position:"relative", width:90, height:90, flexShrink:0 }}>
-                <img
-                  src={src}
-                  alt={`Site photo ${i+1}`}
-                  style={{ width:90, height:90, objectFit:"cover", borderRadius:10, border:"2px solid #E5E7EB", display:"block" }}
-                />
-                <button
-                  onClick={() => removePhoto(i)}
-                  style={{
-                    position:"absolute", top:-7, right:-7,
-                    width:22, height:22, borderRadius:"50%",
-                    border:"2px solid #fff", background:"#E53935",
-                    color:"#fff", fontSize:13, fontWeight:900,
-                    cursor:"pointer", lineHeight:1,
-                    display:"flex", alignItems:"center", justifyContent:"center",
-                    padding:0, boxShadow:"0 1px 4px rgba(0,0,0,0.2)",
-                  }}
-                  aria-label="Remove photo"
-                >×</button>
-              </div>
-            ))}
+        {/* Work details end */}
 
-            {photos.length < 3 && (
-              <label style={{
-                width:90, height:90, border:"2px dashed #D1D5DB", borderRadius:10,
-                display:"flex", flexDirection:"column", alignItems:"center",
-                justifyContent:"center", cursor:"pointer", color:"#9CA3AF",
-                fontSize:11, fontWeight:700, gap:6, flexShrink:0,
-                background:"#FAFAFA", letterSpacing:"0.04em",
-              }}>
-                <span style={{ fontSize:26, lineHeight:1 }}>📷</span>
-                Add Photo
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  style={{ display:"none" }}
-                  onChange={addPhotos}
-                />
-              </label>
-            )}
-          </div>
-          {photos.length > 0 && (
-            <div style={{ fontSize:11, color:"#9CA3AF", marginTop:10 }}>
-              {photos.length}/3 photo{photos.length !== 1 ? "s" : ""} added
-            </div>
-          )}
-        </div>
 
         {error && (
           <div style={{ background:"#FFEBEE", color:"#B71C1C", borderRadius:10, padding:"12px 16px", marginBottom:14, fontSize:13 }}>
@@ -743,7 +632,6 @@ function ManagerDashboard({ onBack }) {
             <div style={{ display:"flex", gap:16, alignItems:"center" }}>
               <span style={{ fontSize:14, fontWeight:800, color:BRAND }}>🕐 {rec.hoursWorked}h</span>
               {rec.area && <span style={{ fontSize:12, color:"#9CA3AF" }}>📍 {rec.area}</span>}
-              {rec.photos?.length > 0 && <span style={{ fontSize:12, color:"#9CA3AF" }}>📷 {rec.photos.length} photo{rec.photos.length!==1?"s":""}</span>}
               {rec.managerNote && <span style={{ fontSize:12, color:"#9CA3AF" }}>💬 Note</span>}
             </div>
           </button>
