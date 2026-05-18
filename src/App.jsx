@@ -38,6 +38,67 @@ const STATUS_CONFIG = {
   denied:   {label:"DENIED",    bg:"#ffebee", color:"#b71c1c", dot:"#b71c1c" },
 };
 
+async function exportRecordsToExcel(records) {
+  if (!records || !records.length) return;
+  const { utils, writeFile } = await import("xlsx");
+  const data = records.map(rec => ({
+    Name: rec.workerName,
+    Trade: rec.trade,
+    Site: rec.site,
+    Date: formatDate(rec.date),
+    Start: rec.startTime,
+    End: rec.endTime,
+    Hours: rec.hoursWorked,
+    Status: rec.status,
+    Area: rec.area || "",
+    Description: rec.description || "",
+    Materials: rec.materials || "",
+    "Manager Note": rec.managerNote || "",
+  }));
+  const worksheet = utils.json_to_sheet(data);
+  const workbook = utils.book_new();
+  utils.book_append_sheet(workbook, worksheet, "Daywork Records");
+  writeFile(workbook, `daywork-records-${Date.now()}.xlsx`);
+}
+
+async function exportRecordsToPdf(records) {
+  if (!records || !records.length) return;
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
+  const doc = new jsPDF({ unit: "pt", format: "letter" });
+  const columns = [
+    "Name", "Trade", "Site", "Date", "Start", "End", "Hours", "Status",
+    "Area", "Description", "Materials", "Manager Note",
+  ];
+  const body = records.map(rec => [
+    rec.workerName,
+    rec.trade,
+    rec.site,
+    formatDate(rec.date),
+    rec.startTime,
+    rec.endTime,
+    String(rec.hoursWorked),
+    rec.status,
+    rec.area || "",
+    rec.description || "",
+    rec.materials || "",
+    rec.managerNote || "",
+  ]);
+
+  autoTable(doc, {
+    head: [columns],
+    body,
+    styles: { fontSize: 8, cellPadding: 4 },
+    headStyles: { fillColor: [26, 58, 92], textColor: 255 },
+    startY: 40,
+    margin: { left: 20, right: 20 },
+    columnStyles: { 0: { cellWidth: 70 }, 1: { cellWidth: 50 }, 2: { cellWidth: 50 } },
+  });
+  doc.save(`daywork-records-${Date.now()}.pdf`);
+}
+
 // ── Firebase helpers ────────────────────────────────────────────────────────
 async function loadRecords() {
   try {
@@ -578,9 +639,17 @@ function ManagerDashboard({ onBack }) {
               <div style={{ fontSize:18, fontWeight:800, color:"#fff" }}>Daywork Records</div>
             </div>
           </div>
-          <button aria-label="Refresh records" onClick={refresh} style={{ background:"rgba(255,255,255,0.1)", border:"none", color:"#fff", borderRadius:8, padding:"8px 14px", cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>
-            ↻ Refresh
-          </button>
+          <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+            <button aria-label="Refresh records" onClick={refresh} style={{ background:"rgba(255,255,255,0.1)", border:"none", color:"#fff", borderRadius:8, padding:"8px 14px", cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>
+              ↻ Refresh
+            </button>
+            <button onClick={() => exportRecordsToExcel(filtered)} style={{ background:"#fff", border:"2px solid #E5E7EB", color:"#1C1C1E", borderRadius:10, padding:"8px 14px", cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>
+              Export XLSX
+            </button>
+            <button onClick={() => exportRecordsToPdf(filtered)} style={{ background:"#fff", border:"2px solid #E5E7EB", color:"#1C1C1E", borderRadius:10, padding:"8px 14px", cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>
+              Export PDF
+            </button>
+          </div>
         </div>
         <div style={{ display:"flex", gap:10, marginTop:16 }}>
           {[["Total Hrs", totals.hours.toFixed(1)+"h", BRAND2],["Pending", totals.pending, "#F0A500"],["Approved", totals.approved, "#43A047"],["Queried", totals.queried, "#E53935"]].map(([l,v,c]) => (
