@@ -613,7 +613,7 @@ function ManagerDashboard({ onBack }) {
           <label style={S.label}>Manager Note</label>
           <textarea style={{ ...S.input, minHeight:72, resize:"vertical", marginBottom:10 }}
             placeholder="Add a note for this worker…"
-            value={noteText || selected.managerNote || ""}
+            value={noteText}
             onChange={e => setNoteText(e.target.value)} />
           <button style={S.btn(false)} onClick={() => updateStatus(selected.id, selected.status, noteText)}>
             Save Note
