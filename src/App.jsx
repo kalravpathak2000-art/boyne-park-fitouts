@@ -5,13 +5,15 @@ import {
   query, orderBy, serverTimestamp,
 } from "firebase/firestore";
 
-const MANAGER_PIN = "1234";
+// Preferably set VITE_MANAGER_PIN in your environment (Netlify/Vercel/etc.)
+// Falls back to "1234" if not provided (dev only)
+const MANAGER_PIN = import.meta.env.VITE_MANAGER_PIN || "1234";
 const COMPANY     = "Boyne Park Fitouts";
 const TRADES      = ["Fixer","Taper","Plasterer","Painter","Labourer","Other"];
-const SITES       = ["Mastercrad","Frame","UCD","BOA","Other"];
+const SITES       = ["Mastercard","Frame","UCD","BOA","Other"];
 const BRAND       = "#1A3A5C";
 const BRAND2      = "#F0A500";
-const BRAND_DARK  = "#112742";
+const BRAND_DARK  = "#030303";
 
 function todayStr() { return new Date().toISOString().split("T")[0]; }
 
@@ -32,7 +34,8 @@ function calcHours(start, end) {
 const STATUS_CONFIG = {
   pending:  { label:"PENDING",  bg:"#FFF8E1", color:"#7A5000", dot:"#F0A500" },
   approved: { label:"APPROVED", bg:"#E8F5E9", color:"#1B5E20", dot:"#43A047" },
-  queried:  { label:"QUERIED",  bg:"#FFEBEE", color:"#B71C1C", dot:"#E53935" },
+  queried:  { label:"QUERIED",  bg:"#FFEBEE", color:"#ffae00", dot:"#ff9500" },
+  denied:   {label:"DENIED",    bg:"#ffebee", color:"#b71c1c", dot:"#b71c1c" },
 };
 
 // ── Firebase helpers ────────────────────────────────────────────────────────
@@ -203,7 +206,7 @@ function Landing({ onRole }) {
 // ══════════════════════════════════════════════════════════════════════════
 function WorkerForm({ defaultTrade, onBack }) {
   const [form, setForm] = useState({
-    workerName:"", trade:defaultTrade, site:"Site 1", date:todayStr(),
+    workerName:"", trade:defaultTrade, site:SITES[0], date:todayStr(),
     startTime:"07:00", endTime:"16:00", area:"", description:"", materials:"",
   });
   const [saving,  setSaving]  = useState(false);
@@ -347,6 +350,7 @@ function WorkerForm({ defaultTrade, onBack }) {
         )}
 
         <button
+          aria-label="Submit daywork record"
           style={{ ...S.btn(true), opacity:(!form.workerName||!form.description||saving)?0.5:1 }}
           onClick={submit}
           disabled={!form.workerName||!form.description||saving}
@@ -388,7 +392,7 @@ function ManagerPin({ onUnlock, onBack }) {
         {err && <div style={{ color:"#E53935", fontSize:13, fontWeight:700 }}>Incorrect PIN</div>}
         <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, width:"100%", maxWidth:280 }}>
           {[1,2,3,4,5,6,7,8,9,"",0,"⌫"].map((k,i) => (
-            <button key={i} onClick={() => press(k===""?"":String(k))} style={{
+            <button key={i} aria-label={k===""?undefined:(k==="⌫"?"Backspace":`Digit ${k}`)} onClick={() => press(k===""?"":String(k))} style={{
               padding:"18px 0", border:`2px solid ${k===""?"transparent":"#E5E7EB"}`,
               borderRadius:12, background:k===""?"transparent":"#fff",
               fontSize:k==="⌫"?18:22, fontWeight:700,
@@ -419,6 +423,9 @@ function ManagerDashboard({ onBack }) {
   }, []);
 
   useEffect(() => {
+    // Calling refresh synchronously here updates state; suppress the rule as this
+    // initial load is intended and refresh() is memoized via useCallback.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
     const t = setInterval(refresh, 30000);
     return () => clearInterval(t);
@@ -571,7 +578,7 @@ function ManagerDashboard({ onBack }) {
               <div style={{ fontSize:18, fontWeight:800, color:"#fff" }}>Daywork Records</div>
             </div>
           </div>
-          <button onClick={refresh} style={{ background:"rgba(255,255,255,0.1)", border:"none", color:"#fff", borderRadius:8, padding:"8px 14px", cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>
+          <button aria-label="Refresh records" onClick={refresh} style={{ background:"rgba(255,255,255,0.1)", border:"none", color:"#fff", borderRadius:8, padding:"8px 14px", cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>
             ↻ Refresh
           </button>
         </div>
