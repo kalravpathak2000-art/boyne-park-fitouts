@@ -352,6 +352,15 @@ function WorkerForm({ defaultTrade, onBack }) {
             </div>
           </div>
         </div>
+        {/*if worked on other site , please mention below*/}
+        <div style={S.card}>
+          <div style={{ marginBottom:16 }}>
+            <label style={S.label}>Area / Location on Site</label>
+            <input style={{ ...S.input, borderColor:focus==="area"?BRAND:"#E5E7EB" }}
+              placeholder="e.g. Level 2, Flat 14, Kitchen" value={form.area}
+              onChange={e => set("area",e.target.value)}
+              onFocus={() => setFocus("area")} onBlur={() => setFocus(null)} />
+          </div>
 
         {/* Date + Times */}
         <div style={S.card}>
