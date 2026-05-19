@@ -5,8 +5,6 @@ import {
   query, orderBy, serverTimestamp,
 } from "firebase/firestore";
 
-// Preferably set VITE_MANAGER_PIN in your environment (Netlify/Vercel/etc.)
-// Falls back to "1234" if not provided (dev only)
 const MANAGER_PIN = import.meta.env.VITE_MANAGER_PIN || "1234";
 const COMPANY     = "Boyne Park Fitouts";
 const TRADES      = ["Fixer","Taper","Plasterer","Painter","Labourer","Other"];
@@ -35,7 +33,7 @@ const STATUS_CONFIG = {
   pending:  { label:"PENDING",  bg:"#FFF8E1", color:"#7A5000", dot:"#F0A500" },
   approved: { label:"APPROVED", bg:"#E8F5E9", color:"#1B5E20", dot:"#43A047" },
   queried:  { label:"QUERIED",  bg:"#FFEBEE", color:"#ffae00", dot:"#ff9500" },
-  denied:   {label:"DENIED",    bg:"#ffebee", color:"#b71c1c", dot:"#b71c1c" },
+  denied:   { label:"DENIED",   bg:"#ffebee", color:"#b71c1c", dot:"#b71c1c" },
 };
 
 async function exportRecordsToExcel(records) {
@@ -69,32 +67,20 @@ async function exportRecordsToPdf(records) {
   ]);
   const doc = new jsPDF({ unit: "pt", format: "letter" });
   const columns = [
-    "Name", "Trade", "Site", "Date", "Start", "End", "Hours", "Status",
-    "Area", "Description", "Materials", "Manager Note",
+    "Name","Trade","Site","Date","Start","End","Hours","Status",
+    "Area","Description","Materials","Manager Note",
   ];
   const body = records.map(rec => [
-    rec.workerName,
-    rec.trade,
-    rec.site,
-    formatDate(rec.date),
-    rec.startTime,
-    rec.endTime,
-    String(rec.hoursWorked),
-    rec.status,
-    rec.area || "",
-    rec.description || "",
-    rec.materials || "",
-    rec.managerNote || "",
+    rec.workerName, rec.trade, rec.site, formatDate(rec.date),
+    rec.startTime, rec.endTime, String(rec.hoursWorked), rec.status,
+    rec.area || "", rec.description || "", rec.materials || "", rec.managerNote || "",
   ]);
-
   autoTable(doc, {
-    head: [columns],
-    body,
-    styles: { fontSize: 8, cellPadding: 4 },
-    headStyles: { fillColor: [26, 58, 92], textColor: 255 },
-    startY: 40,
-    margin: { left: 20, right: 20 },
-    columnStyles: { 0: { cellWidth: 70 }, 1: { cellWidth: 50 }, 2: { cellWidth: 50 } },
+    head: [columns], body,
+    styles: { fontSize:8, cellPadding:4 },
+    headStyles: { fillColor:[26,58,92], textColor:255 },
+    startY: 40, margin: { left:20, right:20 },
+    columnStyles: { 0:{ cellWidth:70 }, 1:{ cellWidth:50 }, 2:{ cellWidth:50 } },
   });
   doc.save(`daywork-records-${Date.now()}.pdf`);
 }
@@ -116,10 +102,7 @@ async function loadRecords() {
 }
 
 async function addRecord(record) {
-  await addDoc(collection(db,"daywork"), {
-    ...record,
-    submittedAt: serverTimestamp(),
-  });
+  await addDoc(collection(db,"daywork"), { ...record, submittedAt: serverTimestamp() });
 }
 
 async function updateRecord(id, updates) {
@@ -156,7 +139,8 @@ const S = {
     display:"inline-flex", alignItems:"center", gap:5,
     padding:"3px 10px", borderRadius:20, fontSize:10, fontWeight:700,
     letterSpacing:"0.08em",
-    background:STATUS_CONFIG[status].bg, color:STATUS_CONFIG[status].color,
+    background: STATUS_CONFIG[status]?.bg || "#F3F4F6",
+    color:       STATUS_CONFIG[status]?.color || "#6B7280",
   }),
 };
 
@@ -226,8 +210,7 @@ function Landing({ onRole }) {
               style={{
                 display:"flex", alignItems:"center", gap:14, padding:"16px 18px",
                 background:"#fff", border:"2px solid #E5E7EB", borderRadius:14,
-                cursor:"pointer", fontFamily:"inherit", textAlign:"left",
-                transition:"border-color 0.15s",
+                cursor:"pointer", fontFamily:"inherit", textAlign:"left", transition:"border-color 0.15s",
               }}
               onMouseEnter={e => { e.currentTarget.style.borderColor=BRAND2; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor="#E5E7EB"; }}
@@ -270,6 +253,7 @@ function WorkerForm({ defaultTrade, onBack }) {
     workerName:"", trade:defaultTrade, site:SITES[0], date:todayStr(),
     startTime:"07:00", endTime:"16:00", area:"", description:"", materials:"",
   });
+  const [photos,  setPhotos]  = useState([]);
   const [saving,  setSaving]  = useState(false);
   const [done,    setDone]    = useState(false);
   const [error,   setError]   = useState("");
@@ -278,12 +262,25 @@ function WorkerForm({ defaultTrade, onBack }) {
   const hours = calcHours(form.startTime, form.endTime);
   const set   = (k,v) => setForm(f => ({ ...f, [k]:v }));
 
+  const addPhotos = (e) => {
+    const files = Array.from(e.target.files);
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        setPhotos(prev => prev.length >= 3 ? prev : [...prev, ev.target.result]);
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = "";
+  };
+
+  const removePhoto = (i) => setPhotos(p => p.filter((_, idx) => idx !== i));
 
   const submit = async () => {
     if (!form.workerName || !form.description) return;
     setSaving(true); setError("");
     try {
-      await addRecord({ ...form, hoursWorked:hours, status:"pending", managerNote:"" });
+      await addRecord({ ...form, hoursWorked:hours, status:"pending", managerNote:"", photos });
       setDone(true);
     } catch(e) {
       console.error("Submit error:", e);
@@ -298,7 +295,7 @@ function WorkerForm({ defaultTrade, onBack }) {
       <div style={{ fontSize:22, fontWeight:800, marginBottom:8 }}>Record Submitted!</div>
       <div style={{ color:"#6B7280", fontSize:14, marginBottom:32 }}>Daywork for {formatDate(form.date)} has been saved.</div>
       <div style={{ display:"flex", flexDirection:"column", gap:12, width:"100%", maxWidth:300 }}>
-        <button style={S.btn(true)} onClick={() => { setDone(false); set("description",""); set("materials",""); }}>
+        <button style={S.btn(true)} onClick={() => { setDone(false); set("description",""); set("materials",""); setPhotos([]); }}>
           Submit Another
         </button>
         <button style={{ ...S.btn(false), background:"transparent", color:BRAND, border:"2px solid "+BRAND }} onClick={onBack}>
@@ -313,13 +310,13 @@ function WorkerForm({ defaultTrade, onBack }) {
       <Header subtitle={`${form.trade} · Daywork Record`} onBack={onBack} />
       <div style={{ padding:"20px 20px 40px", maxWidth:520, margin:"0 auto", boxSizing:"border-box" }}>
 
-        {/* Hours summary card */}
+        {/* Hours summary */}
         <div style={{ ...S.card, background:hours>0?BRAND:"#F3F4F6", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <div style={{ fontSize:13, fontWeight:600, color:hours>0?"rgba(255,255,255,0.75)":"#9CA3AF" }}>Hours Today</div>
           <div style={{ fontSize:30, fontWeight:900, color:hours>0?BRAND2:"#D1D5DB" }}>{hours}h</div>
         </div>
 
-        {/* Name + Trade */}
+        {/* Name + Trade + Site */}
         <div style={S.card}>
           <div style={{ marginBottom:16 }}>
             <label style={S.label}>Your Name *</label>
@@ -328,7 +325,7 @@ function WorkerForm({ defaultTrade, onBack }) {
               onChange={e => set("workerName",e.target.value)}
               onFocus={() => setFocus("name")} onBlur={() => setFocus(null)} />
           </div>
-          <div>
+          <div style={{ marginBottom:16 }}>
             <label style={S.label}>Trade</label>
             <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
               {TRADES.map(t => (
@@ -401,8 +398,43 @@ function WorkerForm({ defaultTrade, onBack }) {
           </div>
         </div>
 
-        {/* Work details end */}
-
+        {/* Photo upload */}
+        <div style={S.card}>
+          <label style={S.label}>Site Photos (up to 3, optional)</label>
+          <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
+            {photos.map((src, i) => (
+              <div key={i} style={{ position:"relative", width:90, height:90, flexShrink:0 }}>
+                <img src={src} alt={`Site photo ${i+1}`}
+                  style={{ width:90, height:90, objectFit:"cover", borderRadius:10, border:"2px solid #E5E7EB", display:"block" }} />
+                <button onClick={() => removePhoto(i)} style={{
+                  position:"absolute", top:-7, right:-7, width:22, height:22,
+                  borderRadius:"50%", border:"2px solid #fff", background:"#E53935",
+                  color:"#fff", fontSize:13, fontWeight:900, cursor:"pointer",
+                  display:"flex", alignItems:"center", justifyContent:"center", padding:0,
+                  boxShadow:"0 1px 4px rgba(0,0,0,0.2)",
+                }}>×</button>
+              </div>
+            ))}
+            {photos.length < 3 && (
+              <label style={{
+                width:90, height:90, border:"2px dashed #D1D5DB", borderRadius:10,
+                display:"flex", flexDirection:"column", alignItems:"center",
+                justifyContent:"center", cursor:"pointer", color:"#9CA3AF",
+                fontSize:11, fontWeight:700, gap:6, flexShrink:0,
+                background:"#FAFAFA", letterSpacing:"0.04em",
+              }}>
+                <span style={{ fontSize:26, lineHeight:1 }}>📷</span>
+                Add Photo
+                <input type="file" accept="image/*" multiple style={{ display:"none" }} onChange={addPhotos} />
+              </label>
+            )}
+          </div>
+          {photos.length > 0 && (
+            <div style={{ fontSize:11, color:"#9CA3AF", marginTop:10 }}>
+              {photos.length}/3 photo{photos.length !== 1 ? "s" : ""} added
+            </div>
+          )}
+        </div>
 
         {error && (
           <div style={{ background:"#FFEBEE", color:"#B71C1C", borderRadius:10, padding:"12px 16px", marginBottom:14, fontSize:13 }}>
@@ -472,12 +504,15 @@ function ManagerPin({ onUnlock, onBack }) {
 // MANAGER DASHBOARD
 // ══════════════════════════════════════════════════════════════════════════
 function ManagerDashboard({ onBack }) {
-  const [records,    setRecords]    = useState([]);
-  const [loading,    setLoading]    = useState(true);
-  const [filter,     setFilter]     = useState("all");
-  const [selectedId, setSelectedId] = useState(null);
-  const [noteText,   setNoteText]   = useState("");
-  const [lightbox,   setLightbox]   = useState(null); // src string for full-screen photo
+  const [records,           setRecords]           = useState([]);
+  const [loading,           setLoading]           = useState(true);
+  const [filter,            setFilter]            = useState("all");
+  const [selectedId,        setSelectedId]        = useState(null);
+  const [noteText,          setNoteText]          = useState("");
+  const [lightbox,          setLightbox]          = useState(null);
+  const [notificationEmail, setNotificationEmail] = useState("");
+  const [emailError,        setEmailError]        = useState("");
+  const [emailStatus,       setEmailStatus]       = useState("");
 
   const refresh = useCallback(async () => {
     const r = await loadRecords(); setRecords(r); setLoading(false);
@@ -522,14 +557,21 @@ function ManagerDashboard({ onBack }) {
       `Materials: ${record.materials || "None"}`,
       `Manager note: ${record.managerNote || "None"}`,
     ];
-    const mailto = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join('\n'))}`;
+    const mailto = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join("\n"))}`;
     window.location.href = mailto;
     setEmailStatus(`Opening email draft for ${email}`);
   };
 
+  const clearDetailState = () => {
+    setSelectedId(null);
+    setNotificationEmail("");
+    setEmailError("");
+    setEmailStatus("");
+  };
+
   const totals = records.reduce((a,r) => {
     a.hours += r.hoursWorked||0; a[r.status] = (a[r.status]||0)+1; return a;
-  }, { hours:0, pending:0, approved:0, queried:0 });
+  }, { hours:0, pending:0, approved:0, queried:0, denied:0 });
 
   const filtered = filter==="all" ? records : records.filter(r => r.status===filter);
   const selected = records.find(r => r.id===selectedId);
@@ -542,30 +584,21 @@ function ManagerDashboard({ onBack }) {
 
   // ── Lightbox ──
   if (lightbox) return (
-    <div
-      onClick={() => setLightbox(null)}
-      style={{
-        position:"fixed", inset:0, background:"rgba(0,0,0,0.92)",
-        display:"flex", alignItems:"center", justifyContent:"center",
-        zIndex:1000, cursor:"zoom-out", padding:20,
-      }}
-    >
-      <img
-        src={lightbox}
-        alt="Site photo full size"
+    <div onClick={() => setLightbox(null)} style={{
+      position:"fixed", inset:0, background:"rgba(0,0,0,0.92)",
+      display:"flex", alignItems:"center", justifyContent:"center",
+      zIndex:1000, cursor:"zoom-out", padding:20,
+    }}>
+      <img src={lightbox} alt="Site photo full size"
         style={{ maxWidth:"100%", maxHeight:"100%", borderRadius:12, objectFit:"contain" }}
-        onClick={e => e.stopPropagation()}
-      />
-      <button
-        onClick={() => setLightbox(null)}
-        style={{
-          position:"absolute", top:16, right:16,
-          background:"rgba(255,255,255,0.15)", border:"none",
-          color:"#fff", borderRadius:"50%", width:40, height:40,
-          fontSize:22, cursor:"pointer", display:"flex",
-          alignItems:"center", justifyContent:"center",
-        }}
-      >×</button>
+        onClick={e => e.stopPropagation()} />
+      <button onClick={() => setLightbox(null)} style={{
+        position:"absolute", top:16, right:16,
+        background:"rgba(255,255,255,0.15)", border:"none",
+        color:"#fff", borderRadius:"50%", width:40, height:40,
+        fontSize:22, cursor:"pointer", display:"flex",
+        alignItems:"center", justifyContent:"center",
+      }}>×</button>
     </div>
   );
 
@@ -573,7 +606,8 @@ function ManagerDashboard({ onBack }) {
   if (selected) return (
     <div style={S.page}>
       <div style={{ background:BRAND_DARK, padding:"20px 20px 18px" }}>
-        <button onClick={() => setSelectedId(null)} style={{ background:"none", border:"none", color:"rgba(255,255,255,0.7)", fontSize:13, cursor:"pointer", marginBottom:12, padding:0, fontFamily:"inherit" }}>← Back</button>
+        <button onClick={clearDetailState}
+          style={{ background:"none", border:"none", color:"rgba(255,255,255,0.7)", fontSize:13, cursor:"pointer", marginBottom:12, padding:0, fontFamily:"inherit" }}>← Back</button>
         <div style={{ display:"flex", alignItems:"center", gap:12 }}>
           <LogoMark size={40} />
           <div>
@@ -583,6 +617,8 @@ function ManagerDashboard({ onBack }) {
         </div>
       </div>
       <div style={{ padding:"20px 20px 40px", maxWidth:520, margin:"0 auto", boxSizing:"border-box" }}>
+
+        {/* Stats bar */}
         <div style={{ ...S.card, background:BRAND, display:"flex", justifyContent:"space-around" }}>
           {[["Hours",`${selected.hoursWorked}h`],["Start",selected.startTime],["End",selected.endTime],["Date",formatDate(selected.date)]].map(([l,v]) => (
             <div key={l} style={{ textAlign:"center", padding:"4px 12px" }}>
@@ -592,7 +628,13 @@ function ManagerDashboard({ onBack }) {
           ))}
         </div>
 
-        {[["🏢 Site", selected.site||"Not specified"],["📍 Area / Location", selected.area||"Not specified"],["📝 Work Description", selected.description],selected.materials&&["🧱 Materials Used", selected.materials]].filter(Boolean).map(([l,v]) => (
+        {/* Info cards */}
+        {[
+          ["🏢 Site", selected.site||"Not specified"],
+          ["📍 Area / Location", selected.area||"Not specified"],
+          ["📝 Work Description", selected.description],
+          selected.materials && ["🧱 Materials Used", selected.materials],
+        ].filter(Boolean).map(([l,v]) => (
           <div key={l} style={S.card}>
             <div style={{ fontSize:11, fontWeight:700, color:"#9CA3AF", letterSpacing:"0.08em", marginBottom:8 }}>{l}</div>
             <div style={{ fontSize:14, lineHeight:1.6 }}>{v}</div>
@@ -605,25 +647,16 @@ function ManagerDashboard({ onBack }) {
             <div style={{ fontSize:11, fontWeight:700, color:"#9CA3AF", letterSpacing:"0.08em", marginBottom:12 }}>📷 SITE PHOTOS</div>
             <div style={{ display:"flex", gap:10, flexWrap:"wrap" }}>
               {selected.photos.map((src, i) => (
-                <img
-                  key={i}
-                  src={src}
-                  alt={`Site photo ${i+1}`}
+                <img key={i} src={src} alt={`Site photo ${i+1}`}
                   onClick={() => setLightbox(src)}
-                  style={{
-                    width:100, height:100, objectFit:"cover",
-                    borderRadius:10, border:"2px solid #E5E7EB",
-                    cursor:"zoom-in", display:"block",
-                  }}
-                />
+                  style={{ width:100, height:100, objectFit:"cover", borderRadius:10, border:"2px solid #E5E7EB", cursor:"zoom-in", display:"block" }} />
               ))}
             </div>
-            <div style={{ fontSize:11, color:"#9CA3AF", marginTop:10 }}>
-              Tap a photo to view full size
-            </div>
+            <div style={{ fontSize:11, color:"#9CA3AF", marginTop:10 }}>Tap a photo to view full size</div>
           </div>
         )}
 
+        {/* Status + note + email */}
         <div style={S.card}>
           <div style={{ fontSize:11, fontWeight:700, color:"#9CA3AF", letterSpacing:"0.08em", marginBottom:12 }}>UPDATE STATUS</div>
           <div style={{ display:"flex", gap:8, marginBottom:16 }}>
@@ -645,19 +678,22 @@ function ManagerDashboard({ onBack }) {
           <button style={S.btn(false)} onClick={() => updateStatus(selected.id, selected.status, noteText)}>
             Save Note
           </button>
+
           <div style={{ marginTop:18 }}>
             <label style={S.label}>Send record to email</label>
             <input type="email" style={{ ...S.input, marginBottom:10 }}
               placeholder="e.g. client@example.com"
               value={notificationEmail}
               onChange={e => { setNotificationEmail(e.target.value); setEmailError(""); setEmailStatus(""); }} />
-            <button style={{ ...S.btn(true), width:"100%" }} onClick={() => sendRecordByEmail(selected, notificationEmail)}>
+            <button style={{ ...S.btn(true), width:"100%" }}
+              onClick={() => sendRecordByEmail(selected, notificationEmail)}>
               Send Email Notification
             </button>
-            {emailError && <div style={{ color:"#B71C1C", marginTop:10, fontSize:13 }}>{emailError}</div>}
+            {emailError  && <div style={{ color:"#B71C1C", marginTop:10, fontSize:13 }}>{emailError}</div>}
             {emailStatus && <div style={{ color:"#1B5E20", marginTop:10, fontSize:13 }}>{emailStatus}</div>}
           </div>
         </div>
+
         <div style={{ fontSize:11, color:"#9CA3AF", textAlign:"center" }}>
           Submitted {new Date(selected.submittedAt).toLocaleString()}
         </div>
@@ -679,13 +715,16 @@ function ManagerDashboard({ onBack }) {
             </div>
           </div>
           <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-            <button aria-label="Refresh records" onClick={refresh} style={{ background:"rgba(255,255,255,0.1)", border:"none", color:"#fff", borderRadius:8, padding:"8px 14px", cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>
+            <button aria-label="Refresh records" onClick={refresh}
+              style={{ background:"rgba(255,255,255,0.1)", border:"none", color:"#fff", borderRadius:8, padding:"8px 14px", cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>
               ↻ Refresh
             </button>
-            <button onClick={() => exportRecordsToExcel(filtered)} style={{ background:"#fff", border:"2px solid #E5E7EB", color:"#1C1C1E", borderRadius:10, padding:"8px 14px", cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>
+            <button onClick={() => exportRecordsToExcel(filtered)}
+              style={{ background:"#fff", border:"2px solid #E5E7EB", color:"#1C1C1E", borderRadius:10, padding:"8px 14px", cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>
               Export XLSX
             </button>
-            <button onClick={() => exportRecordsToPdf(filtered)} style={{ background:"#fff", border:"2px solid #E5E7EB", color:"#1C1C1E", borderRadius:10, padding:"8px 14px", cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>
+            <button onClick={() => exportRecordsToPdf(filtered)}
+              style={{ background:"#fff", border:"2px solid #E5E7EB", color:"#1C1C1E", borderRadius:10, padding:"8px 14px", cursor:"pointer", fontSize:13, fontFamily:"inherit" }}>
               Export PDF
             </button>
           </div>
@@ -710,7 +749,7 @@ function ManagerDashboard({ onBack }) {
               color:filter===f?"#fff":"#6B7280",
               fontWeight:600, fontSize:12, cursor:"pointer", whiteSpace:"nowrap", fontFamily:"inherit",
             }}>
-              {f==="all" ? `All (${records.length})` : `${STATUS_CONFIG[f].label} (${totals[f]})`}
+              {f==="all" ? `All (${records.length})` : `${STATUS_CONFIG[f].label} (${totals[f]||0})`}
             </button>
           ))}
         </div>
@@ -722,7 +761,7 @@ function ManagerDashboard({ onBack }) {
           </div>
         ) : filtered.map(rec => (
           <button key={rec.id}
-            onClick={() => { setSelectedId(rec.id); setNoteText(rec.managerNote||""); }}
+            onClick={() => { setSelectedId(rec.id); setNoteText(rec.managerNote||""); setNotificationEmail(""); setEmailError(""); setEmailStatus(""); }}
             style={{
               display:"block", width:"100%", textAlign:"left", background:"#fff",
               border:"2px solid #E5E7EB", borderRadius:14, padding:16, marginBottom:10,
@@ -737,8 +776,8 @@ function ManagerDashboard({ onBack }) {
                 <div style={{ fontSize:12, color:"#9CA3AF", marginTop:2 }}>{rec.trade} · {rec.site} · {formatDate(rec.date)}</div>
               </div>
               <div style={S.tag(rec.status)}>
-                <span style={{ width:6, height:6, borderRadius:"50%", background:STATUS_CONFIG[rec.status].dot }} />
-                {STATUS_CONFIG[rec.status].label}
+                <span style={{ width:6, height:6, borderRadius:"50%", background:STATUS_CONFIG[rec.status]?.dot }} />
+                {STATUS_CONFIG[rec.status]?.label}
               </div>
             </div>
             <div style={{ fontSize:13, color:"#4B5563", lineHeight:1.5, marginBottom:10, overflow:"hidden", display:"-webkit-box", WebkitLineClamp:2, WebkitBoxOrient:"vertical" }}>
@@ -747,6 +786,7 @@ function ManagerDashboard({ onBack }) {
             <div style={{ display:"flex", gap:16, alignItems:"center" }}>
               <span style={{ fontSize:14, fontWeight:800, color:BRAND }}>🕐 {rec.hoursWorked}h</span>
               {rec.area && <span style={{ fontSize:12, color:"#9CA3AF" }}>📍 {rec.area}</span>}
+              {rec.photos?.length > 0 && <span style={{ fontSize:12, color:"#9CA3AF" }}>📷 {rec.photos.length} photo{rec.photos.length!==1?"s":""}</span>}
               {rec.managerNote && <span style={{ fontSize:12, color:"#9CA3AF" }}>💬 Note</span>}
             </div>
           </button>
