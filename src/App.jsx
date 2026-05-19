@@ -352,16 +352,7 @@ function WorkerForm({ defaultTrade, onBack }) {
             </div>
           </div>
         </div>
-        {/*if worked on other site , please mention below*/}
-        <div style={S.card}>
-          <div style={{ marginBottom:16 }}>
-            <label style={S.label}>Area / Location on Site</label>
-            <input style={{ ...S.input, borderColor:focus==="area"?BRAND:"#E5E7EB" }}
-              placeholder="e.g. Level 2, Flat 14, Kitchen" value={form.area}
-              onChange={e => set("area",e.target.value)}
-              onFocus={() => setFocus("area")} onBlur={() => setFocus(null)} />
-          </div>
-
+        
         {/* Date + Times */}
         <div style={S.card}>
           <div style={{ marginBottom:16 }}>
@@ -390,6 +381,14 @@ function WorkerForm({ defaultTrade, onBack }) {
               placeholder="e.g. Level 2, Flat 14, Kitchen" value={form.area}
               onChange={e => set("area",e.target.value)}
               onFocus={() => setFocus("area")} onBlur={() => setFocus(null)} />
+          </div>
+        <div style={S.card}>
+          <div style={{ marginBottom:16 }}>
+            <label style={S.label}>Any other sites>
+            <input style={{ ...S.input, borderColor:focus==="Any other sites"?BRAND:"#E5E7EB","#E5E7EB", minHeight:100, resize:"vertical" }}
+              placeholder="e.g. Misc." value={form.Any other sites}
+              onChange={e => set("Any other sites",e.target.value)}
+              onFocus={() => setFocus("Any other sites")} onBlur={() => setFocus(null)} />
           </div>
           <div style={{ marginBottom:16 }}>
             <label style={S.label}>Description of Work *</label>
