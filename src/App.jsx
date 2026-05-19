@@ -522,7 +522,7 @@ function ManagerDashboard({ onBack }) {
   }, []);
 
   useEffect(() => {
-    refresh();
+    refresh(); // eslint-disable-line react-hooks/set-state-in-effect
     const t = setInterval(refresh, 30000);
     return () => clearInterval(t);
   }, [refresh]);
