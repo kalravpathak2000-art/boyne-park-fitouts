@@ -338,7 +338,7 @@ function WorkerForm({ defaultTrade, onBack }) {
               ))}
             </div>
           </div>
-          <div style={{ marginTop:16 }}>
+          <div>
             <label style={S.label}>Site *</label>
             <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
               {SITES.map(s => (
@@ -485,14 +485,17 @@ function ManagerPin({ onUnlock, onBack }) {
         {err && <div style={{ color:"#E53935", fontSize:13, fontWeight:700 }}>Incorrect PIN</div>}
         <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, width:"100%", maxWidth:280 }}>
           {[1,2,3,4,5,6,7,8,9,"",0,"⌫"].map((k,i) => (
-            <button key={i} aria-label={k===""?undefined:(k==="⌫"?"Backspace":`Digit ${k}`)} onClick={() => press(k===""?"":String(k))} style={{
-              padding:"18px 0", border:`2px solid ${k===""?"transparent":"#E5E7EB"}`,
-              borderRadius:12, background:k===""?"transparent":"#fff",
-              fontSize:k==="⌫"?18:22, fontWeight:700,
-              cursor:k===""?"default":"pointer",
-              boxShadow:k!==""&&k!=="⌫"?"0 1px 4px rgba(0,0,0,0.06)":"none",
-              fontFamily:"inherit", color:BRAND,
-            }}>{k}</button>
+            <button key={i}
+              aria-label={k===""?undefined:(k==="⌫"?"Backspace":`Digit ${k}`)}
+              onClick={() => press(k===""?"":String(k))}
+              style={{
+                padding:"18px 0", border:`2px solid ${k===""?"transparent":"#E5E7EB"}`,
+                borderRadius:12, background:k===""?"transparent":"#fff",
+                fontSize:k==="⌫"?18:22, fontWeight:700,
+                cursor:k===""?"default":"pointer",
+                boxShadow:k!==""&&k!=="⌫"?"0 1px 4px rgba(0,0,0,0.06)":"none",
+                fontFamily:"inherit", color:BRAND,
+              }}>{k}</button>
           ))}
         </div>
       </div>
@@ -519,9 +522,6 @@ function ManagerDashboard({ onBack }) {
   }, []);
 
   useEffect(() => {
-    // Calling refresh synchronously here updates state; suppress the rule as this
-    // initial load is intended and refresh() is memoized via useCallback.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
     const t = setInterval(refresh, 30000);
     return () => clearInterval(t);
