@@ -500,6 +500,33 @@ function ManagerDashboard({ onBack }) {
     setSelectedId(null);
   };
 
+  const sendRecordByEmail = (record, email) => {
+    setEmailStatus("");
+    setEmailError("");
+    if (!email || !email.includes("@")) {
+      setEmailError("Enter a valid email address.");
+      return;
+    }
+    const subject = `Daywork record for ${record.workerName} (${formatDate(record.date)})`;
+    const lines = [
+      `Worker: ${record.workerName}`,
+      `Trade: ${record.trade}`,
+      `Site: ${record.site}`,
+      `Date: ${formatDate(record.date)}`,
+      `Start: ${record.startTime}`,
+      `End: ${record.endTime}`,
+      `Hours: ${record.hoursWorked}h`,
+      `Status: ${record.status}`,
+      `Area: ${record.area || "Not specified"}`,
+      `Description: ${record.description || "None"}`,
+      `Materials: ${record.materials || "None"}`,
+      `Manager note: ${record.managerNote || "None"}`,
+    ];
+    const mailto = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join('\n'))}`;
+    window.location.href = mailto;
+    setEmailStatus(`Opening email draft for ${email}`);
+  };
+
   const totals = records.reduce((a,r) => {
     a.hours += r.hoursWorked||0; a[r.status] = (a[r.status]||0)+1; return a;
   }, { hours:0, pending:0, approved:0, queried:0 });
@@ -618,6 +645,18 @@ function ManagerDashboard({ onBack }) {
           <button style={S.btn(false)} onClick={() => updateStatus(selected.id, selected.status, noteText)}>
             Save Note
           </button>
+          <div style={{ marginTop:18 }}>
+            <label style={S.label}>Send record to email</label>
+            <input type="email" style={{ ...S.input, marginBottom:10 }}
+              placeholder="e.g. client@example.com"
+              value={notificationEmail}
+              onChange={e => { setNotificationEmail(e.target.value); setEmailError(""); setEmailStatus(""); }} />
+            <button style={{ ...S.btn(true), width:"100%" }} onClick={() => sendRecordByEmail(selected, notificationEmail)}>
+              Send Email Notification
+            </button>
+            {emailError && <div style={{ color:"#B71C1C", marginTop:10, fontSize:13 }}>{emailError}</div>}
+            {emailStatus && <div style={{ color:"#1B5E20", marginTop:10, fontSize:13 }}>{emailStatus}</div>}
+          </div>
         </div>
         <div style={{ fontSize:11, color:"#9CA3AF", textAlign:"center" }}>
           Submitted {new Date(selected.submittedAt).toLocaleString()}
